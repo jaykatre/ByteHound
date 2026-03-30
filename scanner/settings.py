@@ -32,7 +32,7 @@ _db_url = os.environ.get("DATABASE_URL")
 if _db_url:
     # Simple parser for postgres://user:pass@host:port/db
     import re
-    m = re.match(r"postgres://([^:]+):([^@]+)@([^:]+):(\d+)/(.+)", _db_url)
+    m = re.match(r"postgresql?://([^:]+):([^@]+)@([^:]+):(\d+)/(.+)", _db_url)
     if m:
         DATABASES["default"].update({
             "USER": m.group(1),
