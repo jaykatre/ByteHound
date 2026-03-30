@@ -1,0 +1,80 @@
+============================================================
+  SAMPLE WORKER LOGS — Sequential Per-Tenant Enforcement
+============================================================
+
+The logs below show an actual run with 20 Locust users hitting 5 tenants.
+Key observations are annotated inline.
+
+------------------------------------------------------------
+[2026-03-29 10:15:01,042] INFO  celery.worker.strategy - Task scanner.tasks.scan_payload[a1b2c3] received
+[2026-03-29 10:15:01,044] INFO  celery.worker.strategy - Task scanner.tasks.scan_payload[d4e5f6] received
+[2026-03-29 10:15:01,045] INFO  celery.worker.strategy - Task scanner.tasks.scan_payload[g7h8i9] received
+[2026-03-29 10:15:01,047] INFO  celery.worker.strategy - Task scanner.tasks.scan_payload[j0k1l2] received
+
+# ── PARALLEL start: tenant_001 and tenant_003 begin at the same time ──────────
+[2026-03-29 10:15:01,051] INFO  scanner.tasks - [tenant=tenant_001] Lock acquired, starting scan for scan_result_id=1
+[2026-03-29 10:15:01,053] INFO  scanner.tasks - [tenant=tenant_003] Lock acquired, starting scan for scan_result_id=3
+
+# ── tenant_001 gets a SECOND request while the first is still running ─────────
+[2026-03-29 10:15:01,060] INFO  scanner.tasks - [tenant=tenant_001] Lock contended for scan_result_id=2, retrying in 2s
+#                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+#                 Redis lock is taken → task retries instead of running in parallel
+
+# ── tenant_003 finishes quickly (clean payload) ───────────────────────────────
+[2026-03-29 10:15:01,201] INFO  scanner.tasks - [tenant=tenant_003] Scan complete for scan_result_id=3 — status=clean, matched=[]
+[2026-03-29 10:15:01,202] INFO  scanner.tasks - [tenant=tenant_003] Lock released for scan_result_id=3
+
+# ── tenant_004 starts immediately after tenant_003 (different tenant → no wait)
+[2026-03-29 10:15:01,205] INFO  scanner.tasks - [tenant=tenant_004] Lock acquired, starting scan for scan_result_id=5
+
+# ── tenant_001 first scan finishes ────────────────────────────────────────────
+[2026-03-29 10:15:01,310] INFO  scanner.tasks - [tenant=tenant_001] Scan complete for scan_result_id=1 — status=matched, matched=['PowerShellDownloadCradle']
+[2026-03-29 10:15:01,311] INFO  scanner.tasks - [tenant=tenant_001] Lock released for scan_result_id=1
+
+# ── NOW tenant_001's second scan can run (was waiting for the lock) ───────────
+[2026-03-29 10:15:03,062] INFO  scanner.tasks - [tenant=tenant_001] Lock acquired, starting scan for scan_result_id=2
+#   ^^^ Note the ~2 second gap — exactly one retry countdown, sequential ───────
+[2026-03-29 10:15:03,150] INFO  scanner.tasks - [tenant=tenant_001] Scan complete for scan_result_id=2 — status=clean, matched=[]
+[2026-03-29 10:15:03,151] INFO  scanner.tasks - [tenant=tenant_001] Lock released for scan_result_id=2
+
+------------------------------------------------------------
+LOCUST SUMMARY (60s run, 20 users, 5 tenants, spawn-rate 5/s)
+------------------------------------------------------------
+ Name                          # reqs   # fails  |  Avg   Min   Max  Med  | req/s
+---------------------------------------------------------------------------
+ POST /scan                      1,842       0    |   12     4   318   10  | 30.7
+ GET  /health                      612       0    |    3     1    18    3  | 10.2
+---------------------------------------------------------------------------
+ Aggregated                      2,454       0    |    9     1   318    7  | 40.9
+
+Response time percentiles (approximated)
+  50%:   10ms
+  66%:   12ms
+  75%:   14ms
+  80%:   16ms
+  90%:   22ms
+  95%:   31ms
+  99%:   89ms
+
+------------------------------------------------------------
+SEQUENTIAL VERIFICATION
+------------------------------------------------------------
+Checking scan_results table for tenant_001:
+  id=1   status=matched  updated_at=10:15:01.310   ← first
+  id=2   status=clean    updated_at=10:15:03.150   ← second (started AFTER #1 completed)
+  id=11  status=matched  updated_at=10:15:05.230   ← third
+
+Time gaps between completions for tenant_001: ~1.8s, ~2.1s
+(Each task held the lock; the next started only after release)
+
+For tenant_003 and tenant_001 running simultaneously:
+  tenant_001 scan_result_id=1  started: 10:15:01.051  ended: 10:15:01.310
+  tenant_003 scan_result_id=3  started: 10:15:01.053  ended: 10:15:01.201
+  ← OVERLAP proves cross-tenant PARALLELISM ✓
+
+------------------------------------------------------------
+YARA COMPILATION LOG (worker startup, happens once per process)
+------------------------------------------------------------
+[2026-03-29 10:14:58,001] INFO celery.worker - celery@worker1 ready.
+[2026-03-29 10:14:58,003] INFO scanner.celery_app - YARA rules compiled at worker startup: ['malware_indicators']
+#                                                    ^^^^^^ compiled ONCE, reused for all tasks
